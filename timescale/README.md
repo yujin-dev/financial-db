@@ -1,6 +1,8 @@
-#timeseries-db #timescaledb #hypertable #hyperfunctions #financial-timeseries
+#timescale #timeseries-db #hypertable #hyperfunctions #financial-timeseries
 
 # Install
+install with docker
+
 - [Install self-hosted TimescaleDB from source](https://docs.timescale.com/install/latest/self-hosted/installation-source/#configure-postgresql-after-installing-from-source)
 
 ## Troubleshooting
@@ -75,21 +77,23 @@ postgres=# \dx
 - troubleshooting : [Can't install docker on amazon linux instance](https://stackoverflow.com/questions/59101980/cant-install-docker-on-amazon-linux-instance)
 
 # Use-Case
-## Dataset
 
+## dataset
 - daily : 약 40GB의 일별 데이터 테이블을 복제하여 테스트
-  - [Copy a table from one database to another in Postgres](https://stackoverflow.com/questions/3195125/copy-a-table-from-one-database-to-another-in-postgres)
-
-  ```sql
-  pg_dump -U {source-user} -h {source-host} -p {source-port} -t {source-table} -d {source-database} | psql -h localhost -U postgres -d tsdb
-  ```
-
+    - [Copy a table from one database to another in Postgres](https://stackoverflow.com/questions/3195125/copy-a-table-from-one-database-to-another-in-postgres)
 - minutely
-- secondly
+- tick
+    - [kafka-crypto]
 
 ## use hypertable
-```
-SELECT create_hypertable({table-name}, {time-column});
+- hyperfunctions을 활용한 샘플 쿼리 : [Query the data](https://docs.timescale.com/timescaledb/latest/tutorials/financial-tick-data/financial-tick-query/)
+
+hypertable을 생성하려면 먼저 테이블을 생성한 후 빈 테이블을 대상으로 적용한다.
+
+```console
+$ pg_dump --schema-only -U {source-user} -h {source-host} -p {source-port} -t {source-table} -d {source-database} | psql -h localhost -U postgres -d tsdb
+$ \SELECT create_hypertable('sec_dprc', 'datadate');
+$ pg_dump --data-only -U {source-user} -h {source-host} -p {source-port} -t {source-table} -d {source-database} | psql -h localhost -U postgres -d tsdb
 ```
 
-- hyperfunctions을 활용한 샘플 쿼리 : [Query the data](https://docs.timescale.com/timescaledb/latest/tutorials/financial-tick-data/financial-tick-query/)
+보통 테이블 삽입에 비해 hypertable 삽입이 훨씬 오래 걸린다. 
