@@ -1,6 +1,6 @@
-# Timescale
+#timeseries-db #timescaledb #hypertable #hyperfunctions #financial-timeseries
 
-## Install
+# Install
 - [Install self-hosted TimescaleDB from source](https://docs.timescale.com/install/latest/self-hosted/installation-source/#configure-postgresql-after-installing-from-source)
 
 ## Troubleshooting
@@ -29,11 +29,12 @@ initdb: error: invalid locale settings; check lang and lc_* environment variable
 ```
 - [initdb.bin: invalid locale settings; check LANG and LC_* environment variables](https://stackoverflow.com/questions/41956994/initdb-bin-invalid-locale-settings-check-lang-and-lc-environment-variables)
 
-## Setup
+# Setup
 ```console
 $ docker build -t timescaledb .
-$ docker run -d -e POSTGRES_PASSWORD=$PASSWORD -p 5432:5432 --name timescaledb timescaledb
-$ docker exec -it timescaledb sed -i "s/shared_preload_libraries = ''/shared_preload_libraries = 'timescaledb'/" /var/lib/postgresql/data/postgresql.conf
+$ docker run -d -e POSTGRES_PASSWORD=$PASSWORD -p 5432:5432 --net host --name timescaledb timescaledb
+$ docker exec -it timescaledb sed -i "s/#shared_preload_libraries = ''/shared_preload_libraries = 'timescaledb'/" /var/lib/postgresql/data/postgresql.conf
+$ docker exec -it timescaledb sed -i "s/trust/md5/" /var/lib/postgresql/data/pg_hba.conf
 $ docker restart timescaledb
 $ docker exec -it timescaledb psql -U postgres
 psql (13.9 (Debian 13.9-1.pgdg110+1))
@@ -69,9 +70,26 @@ postgres=# \dx
 (2 rows)
 ```
 
+### AWS Linux 2 인스턴스 활용
+- docker 설치 : [Amazon ECS에서 사용할 컨테이너 이미지 생성](https://docs.aws.amazon.com/ko_kr/AmazonECS/latest/developerguide/create-container-image.html)
+- troubleshooting : [Can't install docker on amazon linux instance](https://stackoverflow.com/questions/59101980/cant-install-docker-on-amazon-linux-instance)
 
+# Use-Case
+## Dataset
 
-## Data
-- daily
+- daily : 약 40GB의 일별 데이터 테이블을 복제하여 테스트
+  - [Copy a table from one database to another in Postgres](https://stackoverflow.com/questions/3195125/copy-a-table-from-one-database-to-another-in-postgres)
+
+  ```sql
+  pg_dump -U {source-user} -h {source-host} -p {source-port} -t {source-table} -d {source-database} | psql -h localhost -U postgres -d tsdb
+  ```
+
 - minutely
 - secondly
+
+## use hypertable
+```
+SELECT create_hypertable({table-name}, {time-column});
+```
+
+- hyperfunctions을 활용한 샘플 쿼리 : [Query the data](https://docs.timescale.com/timescaledb/latest/tutorials/financial-tick-data/financial-tick-query/)
