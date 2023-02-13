@@ -75,25 +75,42 @@ postgres=# \dx
 ### AWS Linux 2 인스턴스 활용
 - docker 설치 : [Amazon ECS에서 사용할 컨테이너 이미지 생성](https://docs.aws.amazon.com/ko_kr/AmazonECS/latest/developerguide/create-container-image.html)
 - troubleshooting : [Can't install docker on amazon linux instance](https://stackoverflow.com/questions/59101980/cant-install-docker-on-amazon-linux-instance)
+- docker-compose 설치 : https://soyoung-new-challenge.tistory.com/73
 
 # Use-Case
-
-## dataset
-- daily : 약 40GB의 일별 데이터 테이블을 복제하여 테스트
-    - [Copy a table from one database to another in Postgres](https://stackoverflow.com/questions/3195125/copy-a-table-from-one-database-to-another-in-postgres)
-- minutely
-- tick
-    - [kafka-crypto]
 
 ## use hypertable
 - hyperfunctions을 활용한 샘플 쿼리 : [Query the data](https://docs.timescale.com/timescaledb/latest/tutorials/financial-tick-data/financial-tick-query/)
 
 hypertable을 생성하려면 먼저 테이블을 생성한 후 빈 테이블을 대상으로 적용한다.
 
+## dump data
+- [Logical backups with pg_dump  and pg_restore ](https://docs.timescale.com/timescaledb/latest/how-to-guides/backup-and-restore/pg-dump-and-restore/#restoring-individual-hypertables-from-backup)
+
+보통 테이블 삽입에 비해 hypertable 삽입이 훨씬 오래 걸린다. 이를 해소하기 위해 [timescaledb-parallel-copy](https://github.com/timescale/timescaledb-parallel-copy)를 사용한다.
+
 ```console
-$ pg_dump --schema-only -U {source-user} -h {source-host} -p {source-port} -t {source-table} -d {source-database} | psql -h localhost -U postgres -d tsdb
-$ \SELECT create_hypertable('sec_dprc', 'datadate');
-$ pg_dump --data-only -U {source-user} -h {source-host} -p {source-port} -t {source-table} -d {source-database} | psql -h localhost -U postgres -d tsdb
+$ pg_dump --schema-only -U {source-user} -h {source-host} -p {source-port} -t {source-table} -d {source-database} > schema.sql
+$ psql -U {source-user} -h {source-host} -p {source-port} -d {source-database} -c "\COPY (SELECT * FROM source-table) TO data.csv DELIMITER ',' CSV"
+$ psql -d tsdb -U postgres < schema.sql
+$ psql -d tsdb -U postgres -c "SELECT create_hypertable('{table_name}', '{time_column}')"
+$ psql -d tsdb -U postgres -c "\COPY table_name FROM data.csv CSV"
 ```
 
-보통 테이블 삽입에 비해 hypertable 삽입이 훨씬 오래 걸린다. 
+### check result
+```
+root@ip-172-31-45-28:/# psql -U postgres -d tsdb -c "explain analyze select * from table_name"
+                                                       QUERY PLAN                                                       
+------------------------------------------------------------------------------------------------------------------------
+ Append  (cost=0.00..94.15 rows=1610 width=314) (actual time=0.008..0.039 rows=30 loops=1)
+   ->  Seq Scan on _hyper_1_4240_chunk  (cost=0.00..12.30 rows=230 width=314) (actual time=0.007..0.008 rows=3 loops=1)
+   ->  Seq Scan on _hyper_1_4241_chunk  (cost=0.00..12.30 rows=230 width=314) (actual time=0.003..0.004 rows=5 loops=1)
+   ->  Seq Scan on _hyper_1_4242_chunk  (cost=0.00..12.30 rows=230 width=314) (actual time=0.003..0.004 rows=5 loops=1)
+   ->  Seq Scan on _hyper_1_7016_chunk  (cost=0.00..12.30 rows=230 width=314) (actual time=0.006..0.007 rows=5 loops=1)
+   ->  Seq Scan on _hyper_1_7017_chunk  (cost=0.00..12.30 rows=230 width=314) (actual time=0.002..0.003 rows=5 loops=1)
+   ->  Seq Scan on _hyper_1_7018_chunk  (cost=0.00..12.30 rows=230 width=314) (actual time=0.002..0.003 rows=5 loops=1)
+   ->  Seq Scan on _hyper_1_7019_chunk  (cost=0.00..12.30 rows=230 width=314) (actual time=0.004..0.004 rows=2 loops=1)
+ Planning Time: 8.137 ms
+ Execution Time: 0.127 ms
+(10 rows)
+```
